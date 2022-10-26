@@ -110,7 +110,7 @@ add primary key (VENTA_CUPON_CODIGO)
 
 create table Proveedor(
 	PROVEEDOR_CUIT nvarchar(50) not null,
-	PROVEEDOR_ZONA int,
+	PROVEEDOR_CP decimal(18,0),
 	PROVEEDOR_RAZON_SOCIAL nvarchar(50),
 	PROVEEDOR_MAIL nvarchar(50),
 	PROVEEDOR_DOMICILIO nvarchar(50)
@@ -118,7 +118,7 @@ create table Proveedor(
 alter table Proveedor  
 add primary key (PROVEEDOR_CUIT)
 alter table Proveedor 
-add constraint FK_Proveedor_zona foreign key(PROVEEDOR_ZONA) references Zona(ZONA_CODIGO)
+add constraint FK_Proveedor_CP foreign key(PROVEEDOR_CP) references CODIGO_POSTAL(CODIGO_POSTAL)
 
 
 create table Producto_Categoria(
@@ -185,8 +185,7 @@ add constraint FK_Venta_Producto_Venta foreign key(VENTA_CODIGO) references Vent
 create table Envio_CP(
 	VENTA_CODIGO decimal(19,0) not null,
 	ENVIO_CODIGO nvarchar(255) not null,
-	ZONA_CODIGO int not null,
-	CODIGO_POSTAL decimal(18,0),
+	CODIGO_POSTAL decimal(18,0) not null,
 	ENVIO_PRECIO decimal(18,2)
 );
 
@@ -195,7 +194,7 @@ add constraint FK_ENVIO_CP_VENTA foreign key(VENTA_CODIGO) references Venta(VENT
 alter table Envio_CP
 add  constraint FK_ENVIO_CP_ENVIO foreign key(ENVIO_CODIGO) references Envio(ENVIO_CODIGO)
 alter table Envio_CP
-add  constraint FK_ENVIO_CP_ZONA foreign key(ZONA_CODIGO) references Zona_Localidad(ENVIO_CODIGO)
+add  constraint FK_ENVIO_CP foreign key(CODIGO_POSTAL) references CODIGO_POSTAL(CODIGO_POSTAL)
 
 
 
@@ -226,7 +225,7 @@ add constraint FK_Producto_Por_Categoria foreign key(PRODUCTO_CATEGORIA) referen
 
 create table Cliente(
 	CLIENTE_CODIGO char(6) not null,
-	CLIENTE_ZONA int,
+	CLIENTE_CP decimal (18,0),
 	CLIENTE_DNI decimal(18,0),
 	CLIENTE_NOMBRE nvarchar(255),
 	CLIENTE_TELEFONO decimal(18,0),
@@ -237,24 +236,21 @@ create table Cliente(
 alter table Cliente
 add primary key (CLIENTE_CODIGO)
 alter table cliente 
-add constraint FK_CLIENTE_ZONA foreign key(CLIENTE_ZONA) references zona(Zona_codigo)
+add constraint FK_CLIENTE_CP foreign key(CLIENTE_CP) references CODIGO_POSTAL(CODIGO_POSTAL)
 
 
 --Revisar que onda esto, en el der falta el decimal en el CP
-create table Zona(
-	ZONA_CODIGO int identity(1,1)not null,
-	PROVINCIA nvarchar(255)
+create table CODIGO_POSTAL(
+	CODIGO_POSTAL decimal(18,0) not null,
+	CODIGO_POSTAL_LOCALIDAD_ID nvarchar(50)
 );
-alter table Zona 
-add primary key (ZONA_CODIGO)
+alter table CODIGO_POSTAL 
+add primary key (CODIGO_POSTAL)
 
 create table Zona_Localidad(
-	ZONA_CODIGO int not null,
-	CODIGO_POSTAL decimal(18,0),
-	ZONA_LOCALIDAD nvarchar(50)
+	LOCALIDAD_ID int identity(1,1) not null,
+	PROVINCIA nvarchar(50),
+	LOCALIDAD nvarchar(50)
 );
 alter table Zona_Localidad 
-add constraint FK_Zona_Localidad foreign key(ZONA_CODIGO) references Zona(ZONA_CODIGO)
-
-
-
+add primary key(LOCALIDAD_ID)
