@@ -110,11 +110,12 @@ create table Venta(
 	VENTA_MEDIO_PAGO_COSTO decimal(18,2),
 	VENTA_CANAL nvarchar(255),
 	VENTA_CANAL_COSTO decimal(18,2),
-	VENTA_ENVIO_CODIGO nvarchar(255) NOT NULL,
+	VENTA_ENVIO_CODIGO int NOT NULL,
 	VENTA_COSTO_ENVIO decimal(18,2),
 	VENTA_FECHA date,
 	VENTA_TOTAL decimal(18,2)
 );
+
 
 create table Venta_Producto(
 	VENTA_PRODUCTO_CODIGO nvarchar(50),
@@ -126,17 +127,17 @@ create table Venta_Producto(
 
 
 create table Envio_CP(
-	VENTA_CODIGO decimal(19,0) not null,
-	ENVIO_CODIGO nvarchar(255) not null,
-	CODIGO_POSTAL decimal(18,0) not null,
+	ENVIO_ID int,
+	CODIGO_POSTAL decimal(18,0),
 	ENVIO_PRECIO decimal(18,2)
 );
 
 
 create table Envio(
-	ENVIO_CODIGO nvarchar(255) not null,
+	ENVIO_ID int identity(1,1) not null,
 	ENVIO_MEDIO nvarchar(255),
-	ENVIO_PRECIO decimal(18,2)
+	ENVIO_PRECIO decimal(18,2),
+	ENVIO_TIEMPO decimal(18,2)
 );
 
 
@@ -207,7 +208,7 @@ alter table Producto_Por_Variante
 add constraint PK_Producto_por_variante_Codigo primary key (PRODUCTO_CODIGO,PRODUCTO_VARIANTE_CODIGO) 
 
 alter table Envio 
-add primary key (ENVIO_CODIGO)
+add primary key (ENVIO_ID)
 
 alter table Producto 
 add primary key (PRODUCTO_CODIGO)
@@ -272,8 +273,8 @@ add constraint FK_VENTA_CANAL foreign key(VENTA_CANAL) references Canal_de_Venta
 alter table Venta 
 add constraint FK_VENTA_MEDIO_DE_PAGO foreign key(VENTA_MEDIO_PAGO) references Medio_De_Pago(MEDIO_PAGO_ID)
 
---alter table Venta 
---add constraint FK_VENTA_ENVIO foreign key(VENTA_ENVIO_CODIGO) references Envio_CP(ENVIO_CODIGO) --Crea una fk que apunta a una fk ¿?
+alter table Venta 
+add constraint FK_VENTA_ENVIO foreign key(VENTA_ENVIO_CODIGO) references Envio(ENVIO_ID)
 
 alter table Venta_Producto
 add constraint FK_Venta_Producto_Por_Variante foreign key(VENTA_PRODUCTO_CODIGO,PRODUCTO_VARIANTE_CODIGO) references Producto_Por_Variante(PRODUCTO_CODIGO,PRODUCTO_VARIANTE_CODIGO)
@@ -282,10 +283,7 @@ alter table Venta_Producto
 add constraint FK_Venta_Producto_Venta foreign key(VENTA_CODIGO) references Venta(VENTA_CODIGO)
 
 alter table Envio_CP
-add constraint FK_ENVIO_CP_VENTA foreign key(VENTA_CODIGO) references Venta(VENTA_CODIGO)
-
-alter table Envio_CP
-add  constraint FK_ENVIO_CP_ENVIO foreign key(ENVIO_CODIGO) references Envio(ENVIO_CODIGO)
+add  constraint FK_ENVIO_CP_ENVIO foreign key(ENVIO_ID) references Envio(ENVIO_ID)
 
 alter table Envio_CP
 add  constraint FK_ENVIO_CP foreign key(CODIGO_POSTAL) references CODIGO_POSTAL(CODIGO_POSTAL)
