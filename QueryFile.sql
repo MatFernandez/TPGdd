@@ -32,7 +32,7 @@ create table Compra_Producto(
 
 create table Compra_Descuento(
 	DESCUENTO_COMPRA_CODIGO decimal(19,0) not null,
-	DESCUENTO_COMPRA_VALOR decimal(19,0)
+	DESCUENTO_COMPRA_VALOR decimal(18,2)
 );
 
 
@@ -115,7 +115,6 @@ create table Venta(
 	VENTA_FECHA date,
 	VENTA_TOTAL decimal(18,2)
 );
-
 
 create table Venta_Producto(
 	VENTA_PRODUCTO_CODIGO nvarchar(50),
@@ -298,9 +297,6 @@ end
 go
 
 
-
-
-
 --Stored procedure que borra las tablas (tirar un refresh en GD2C2022 para ver que se borraron las tablas post ejecucion)
 
 create procedure Borrar_Tablas
@@ -331,7 +327,7 @@ end
 go
 
 
---Stored procedure para migrar proveedores de la tabla maestra a nuestro modelo
+--Stored procedure para migrar proveedores de la tabla maestra a nuestro modelo (DESACTUALIZADO)
 
 create procedure Migrar_Proveedores 
 as 
@@ -345,6 +341,134 @@ where PROVEEDOR_CUIT is not null
 end
 go
 
+
+--Stored procedure para migrar Zona-Localidad de Proveedores y Clientes
+
+create procedure Migrar_Zona_Localidad 
+as 
+begin
+insert into Zona_Localidad
+
+select distinct CLIENTE_PROVINCIA, CLIENTE_LOCALIDAD from gd_esquema.Maestra
+union 
+select distinct PROVEEDOR_PROVINCIA, PROVEEDOR_LOCALIDAD from gd_esquema.Maestra
+where CLIENTE_PROVINCIA is not null and CLIENTE_LOCALIDAD is not null
+and PROVEEDOR_PROVINCIA is not null and PROVEEDOR_LOCALIDAD is not null
+
+end 
+go
+
+
+
+--Stored procedure para migrar cupones (REVISAR SI ES PK COMPUESTA CON IMPORTE)
+
+create procedure Migrar_Cupones
+as 
+begin
+insert into Cupon
+
+select distinct VENTA_CUPON_CODIGO, VENTA_CUPON_IMPORTE, VENTA_CUPON_FECHA_DESDE, VENTA_CUPON_FECHA_HASTA, VENTA_CUPON_VALOR,
+VENTA_CUPON_TIPO from gd_esquema.Maestra
+where VENTA_CUPON_CODIGO is not null 
+
+end
+go
+
+
+--Stored procedure para migrar Canales de Ventas
+
+create procedure Migrar_Canal_de_Ventas
+as 
+begin
+insert into Canal_de_Venta
+
+select distinct cast (VENTA_CANAL as nvarchar(255)), VENTA_CANAL_COSTO from gd_esquema.Maestra
+where VENTA_CANAL is not null and VENTA_CANAL_COSTO is not null
+
+end
+go
+
+
+--Stored procedure para migrar Productos tipo Variante
+
+create procedure Migrar_Producto_Tipo_Variante
+as 
+begin
+insert into Producto_Tipo_Variante
+
+select distinct PRODUCTO_VARIANTE_CODIGO, PRODUCTO_TIPO_VARIANTE from gd_esquema.Maestra
+where PRODUCTO_VARIANTE_CODIGO is not null and PRODUCTO_TIPO_VARIANTE is not null
+
+end
+go
+
+
+--Stored procedure para migrar Compra_Descuento
+
+create procedure Migrar_Compra_Descuento
+as 
+begin
+insert into Compra_Descuento
+
+select DESCUENTO_COMPRA_CODIGO, DESCUENTO_COMPRA_VALOR from gd_esquema.Maestra
+where DESCUENTO_COMPRA_CODIGO is not null and DESCUENTO_COMPRA_VALOR is not null
+
+end
+go
+
+
+--Stored procedure para migrar Medio_de_Pago
+
+create procedure Migrar_Medio_de_Pago
+as
+begin
+insert into Medio_de_Pago
+
+select distinct COMPRA_MEDIO_PAGO, VENTA_MEDIO_PAGO_COSTO from gd_esquema.Maestra
+where COMPRA_MEDIO_PAGO is not null
+union
+select distinct VENTA_MEDIO_PAGO, VENTA_MEDIO_PAGO_COSTO from gd_esquema.Maestra
+where VENTA_MEDIO_PAGO is not null
+
+end
+go
+
+
+
+--Stored procedure para migrar los Medio de Pago
+
+--Aca ojo porque el medio de pago para la Compra no tiene costo y para la Venta si, por eso uno los medios con null y los otros con su costo
+--Si bien la consulta esta bien, no se puede insertar porque estamos duplicando los medios de pago (o sea las pks quedan duplicadas)
+--Los medios son iguales para la Compra y la Venta (me fije en la maestra), capaz se puede omitir el union y quede el medio de pago con el costo,
+--y que Compra SOLO traiga el medio sin el costo porque no le interesa
+
+create procedure Migrar_Medio_de_Pago
+as
+begin
+insert into Medio_de_Pago
+
+select distinct COMPRA_MEDIO_PAGO, VENTA_MEDIO_PAGO_COSTO from gd_esquema.Maestra
+where COMPRA_MEDIO_PAGO is not null
+union
+select distinct VENTA_MEDIO_PAGO, VENTA_MEDIO_PAGO_COSTO from gd_esquema.Maestra
+where VENTA_MEDIO_PAGO is not null
+
+end
+go
+
+
+
+
+--Para borrar los stored procedures anteriores
+
+drop procedure Migrar_Medio_de_Pago
+drop procedure Migrar_Compra_Descuento
+drop procedure Migrar_Producto_Tipo_Variante
+drop procedure Migrar_Canal_de_Ventas
+drop procedure Migrar_Cupones
+drop procedure Migrar_Proveedores
+drop procedure Migrar_Zona_Localidad
+drop procedure Borrar_Tablas
 
 
 ---------------------------------------------------------------------------------------------------------
@@ -365,32 +489,56 @@ select "Resultado tablas borradas" = @borrarTablas
 go
 
 
---Migra los proveedores (devuelve 0 si esta todo ok)
+--Migra los proveedores (devuelve 0 si esta todo ok) 
 declare @migracionProveedores int
 exec @migracionProveedores = [Migrar_Proveedores]
 select "Resultado proveedores" = @migracionProveedores
 go
 
 
+--Migra los canales de venta (devuelve 0 si esta todo ok)
+declare @migracionCanalesVenta int
+exec @migracionCanalesVenta = [Migrar_Canal_de_Ventas]
+select "Resultado Canales de Venta" = @migracionCanalesVenta
+go
+
+
+--Migra las Zona Localidad (devuelve 0 si esta todo ok)
+declare @migracionZonaLocalidad int
+exec @migracionZonaLocalidad = [Migrar_Zona_Localidad]
+select "Resultado Zona Localidad" = @migracionZonaLocalidad
+go
+
+
+--Migra los Cupones (devuelve 0 si esta todo ok)
+declare @migracionCupones int
+exec @migracionCupones = [Migrar_Cupones]
+select "Resultado Cupones" = @migracionCupones
+go
+
+
+--Migra los Productos tipo Variante (devuelve 0 si esta todo ok)
+declare @migracionProductosTipoVariantes int
+exec @migracionProductosTipoVariantes = [Migrar_Producto_Tipo_Variante]
+select "Resultado Cupones" = @migracionProductosTipoVariantes
+go
+
+
+--Migra los Compra Descuento (devuelve 0 si esta todo ok)
+declare @migracionCompraDescuento int
+exec @migracionCompraDescuento = [Migrar_Compra_Descuento]
+select "Resultado Cupones" = @migracionCompraDescuento
+go
+
+
+
+
 --------------------------------------------------------------------------------------------------------------------
---------------------------- Consultas utiles para probar si funcionan los procedures y comentarios -----------------
+----------------------- Consultas utiles para probar si funcionan los procedures y otros comentarios ---------------
 --------------------------------------------------------------------------------------------------------------------
 
---El select de la tabla maestra (299064 rows, 6 seg)
 
-select Maestra.PROVEEDOR_CUIT, Maestra.PROVEEDOR_RAZON_SOCIAL, Maestra.PROVEEDOR_MAIL, Maestra.PROVEEDOR_DOMICILIO,
-Maestra.PROVEEDOR_CODIGO_POSTAL, Maestra.PROVEEDOR_LOCALIDAD, Maestra.PROVEEDOR_PROVINCIA from gd_esquema.Maestra
-
-
-
---El select despues de migrar, o sea de nuestra tabla (coinciden los rows 299064), en teoria los carga bien
-
-select * from Proveedor
-
-
---Y este solo muestra los proveedores sin repeticiones (No funciona bien el orden ascendente de razon social¿?¿¿??)
-
-select * from Proveedor
-where PROVEEDOR_CUIT is not null
-group by PROVEEDOR_CUIT, PROVEEDOR_RAZON_SOCIAL, PROVEEDOR_MAIL, PROVEEDOR_DOMICILIO, PROVEEDOR_CP, PROVEEDOR_LOCALIDAD, PROVEEDOR_PROVINCIA
-order by PROVEEDOR_RAZON_SOCIAL ASC
+select * from Canal_de_Venta
+select * from Zona_Localidad
+select * from Producto_Tipo_Variante
+select * from Compra_Descuento
