@@ -85,6 +85,7 @@ create table Cupon(
 create table Proveedor(
 	PROVEEDOR_CUIT nvarchar(50) not null,
 	PROVEEDOR_CP decimal(18,0),
+	PROVEEDOR_LOCALIDAD nvarchar(255),
 	PROVEEDOR_RAZON_SOCIAL nvarchar(50),
 	PROVEEDOR_MAIL nvarchar(50),
 	PROVEEDOR_DOMICILIO nvarchar(50)
@@ -152,8 +153,10 @@ create table Producto(
 create table Cliente(
 	CLIENTE_CODIGO char(6) not null,
 	CLIENTE_CP decimal (18,0),
+	CLIENTE_LOCALIDAD nvarchar(255),
 	CLIENTE_DNI decimal(18,0),
 	CLIENTE_NOMBRE nvarchar(255),
+	CLIENTE_APELLIDO nvarchar(255)
 	CLIENTE_TELEFONO decimal(18,0),
 	ClIENTE_MAIL nvarchar(255),
 	CLIENTE_FECHA_NAC date,
@@ -162,14 +165,14 @@ create table Cliente(
 
 
 create table Zona_Localidad(
-	LOCALIDAD_ID int identity(1,1) not null,
+	CODIGO_POSTAL decimal(18,0) not null,
+	LOCALIDAD nvarchar(50) not null,
 	PROVINCIA nvarchar(50),
-	LOCALIDAD nvarchar(50)
 );
 
 
 create table Codigo_Postal(
-	CODIGO_POSTAL decimal(18,0) not null,
+	
 	CODIGO_POSTAL_LOCALIDAD_ID nvarchar(50)
 );
 
@@ -218,8 +221,8 @@ add primary key (CLIENTE_CODIGO)
 alter table CODIGO_POSTAL 
 add primary key (CODIGO_POSTAL)
 
-alter table Zona_Localidad 
-add primary key(LOCALIDAD_ID)
+alter table Zona
+add constaint PK_Zona primary key(CODIGO_POSTAL,LOCALIDAD_ID)
 
 
 --FOREING KEYS
@@ -255,7 +258,7 @@ alter table Venta_Por_Cupon
 add constraint FK_Venta_Por_Cupon foreign key(VENTA_CUPON_CODIGO) references Cupon(VENTA_CUPON_CODIGO)
 
 alter table Proveedor 
-add constraint FK_Proveedor_CP foreign key(PROVEEDOR_CP) references CODIGO_POSTAL(CODIGO_POSTAL)
+add constraint FK_Proveedor_ZONA foreign key(PROVEEDOR_CP,PROVEEDOR_LOCALIDAD) references ZONA(CODIGO_POSTAL,LOCALIDAD)
 
 alter table Producto_Por_Variante 
 add constraint FK_Producto_por_variante foreign key(PRODUCTO_CODIGO) references Producto(PRODUCTO_CODIGO)
@@ -285,13 +288,13 @@ alter table Envio_CP
 add  constraint FK_ENVIO_CP_ENVIO foreign key(ENVIO_ID) references Envio(ENVIO_ID)
 
 alter table Envio_CP
-add  constraint FK_ENVIO_CP foreign key(CODIGO_POSTAL) references CODIGO_POSTAL(CODIGO_POSTAL)
+add  constraint FK_ENVIO_ZONA foreign key(CODIGO_POSTAL,LOCALIDAD) references Zona(CODIGO_POSTAL,LOCALIDAD)
 
 alter table Producto 
 add constraint FK_Producto_Por_Categoria foreign key(PRODUCTO_CATEGORIA) references Producto_Categoria(PRODUCTO_CATEGORIA_ID)
 
 alter table cliente 
-add constraint FK_CLIENTE_CP foreign key(CLIENTE_CP) references CODIGO_POSTAL(CODIGO_POSTAL)
+add constraint FK_CLIENTE_ZONA foreign key(CLIENTE_CP,CLIENTE_LOCALIDAD) references Zona(CODIGO_POSTAL,LOCALIDAD)
 
 end 
 go
@@ -327,37 +330,52 @@ end
 go
 
 
---Stored procedure para migrar proveedores de la tabla maestra a nuestro modelo (DESACTUALIZADO)
+--Stored procedure para migrar proveedores de la tabla maestra a nuestro modelo
 
 create procedure Migrar_Proveedores 
 as 
 begin
-insert into Proveedor
+insert into Proveedor(PROVEEDOR_CUIT,PROVEEDOR_RAZON_SOCIAL,PROVEEDOR_MAIL,PROVEEDOR_CP,PROVEEDOR_LOCALIDAD,PROVEEDOR_DOMICILIO)
 
-select distinct Maestra.PROVEEDOR_CUIT, Maestra.PROVEEDOR_RAZON_SOCIAL, Maestra.PROVEEDOR_MAIL, Maestra.PROVEEDOR_DOMICILIO,
-Maestra.PROVEEDOR_CODIGO_POSTAL, Maestra.PROVEEDOR_LOCALIDAD, Maestra.PROVEEDOR_PROVINCIA from gd_esquema.Maestra
-where PROVEEDOR_CUIT is not null
+select  distinct Maestra.PROVEEDOR_CUIT, Maestra.PROVEEDOR_RAZON_SOCIAL,
+ Maestra.PROVEEDOR_MAIL, zona.CODIGO_POSTAL,zona.LOCALIDAD, Maestra.PROVEEDOR_DOMICILIO
+ from gd_esquema.Maestra   join Zona on  zona.Codigo_postal = maestra.proveedor_codigo_postal AND zona.Localidad = maestra.PROVEEDOR_localidad
+ where PROVEEDOR_CUIT is not null
 
 end
 go
 
-
---Stored procedure para migrar Zona-Localidad de Proveedores y Clientes
-
-create procedure Migrar_Zona_Localidad 
+--Stored procedure para migrar Zonas de la tabla maestra a nuestro modelo
+create procedure Migrar_Zonas
 as 
 begin
-insert into Zona_Localidad
 
-select distinct CLIENTE_PROVINCIA, CLIENTE_LOCALIDAD from gd_esquema.Maestra
-union 
-select distinct PROVEEDOR_PROVINCIA, PROVEEDOR_LOCALIDAD from gd_esquema.Maestra
-where CLIENTE_PROVINCIA is not null and CLIENTE_LOCALIDAD is not null
-and PROVEEDOR_PROVINCIA is not null and PROVEEDOR_LOCALIDAD is not null
+insert into Zona(CODIGO_POSTAL,LOCALIDAD,PROVINCIA)
 
-end 
+select distinct Maestra.CLIENTE_CODIGO_POSTAL, Maestra.CLIENTE_LOCALIDAD, Maestra.CLIENTE_PROVINCIA from gd_esquema.Maestra
+union
+select distinct Maestra.PROVEEDOR_CODIGO_POSTAL, Maestra.PROVEEDOR_LOCALIDAD, Maestra.PROVEEDOR_PROVINCIA from gd_esquema.Maestra
+where CLIENTE_PROVINCIA is not null and PROVEEDOR_PROVINCIA is not null
+ORDER BY CLIENTE_LOCALIDAD
+/* nose porque devuelve bien pero le agrega una primer fila de null....*/
+end
 go
 
+--Stored procedure para migrar clientes de la tabla maestra a nuestro modelo
+
+create procedure Migrar_Clientes
+as 
+begin
+insert into Cliente(CLIENTE_DNI,CLIENTE_NOMBRE,CLIENTE_APELLIDO,CLIENTE_TELEFONO,CLIENTE_MAIL,CLIENTE_DIRECCION,CLIENTE_FECHA_NAC,CLIENTE_CP,CLIENTE_LOCALIDAD)
+
+select  distinct Maestra.CLIENTE_DNI,Maestra.CLIENTE_NOMBRE, Maestra.CLIENTE_APELLIDO, Maestra.CLIENTE_TELEFONO,
+Maestra.CLIENTE_MAIL, Maestra.CLIENTE_FECHA_NAC,Maestra.CLIENTE_DIRECCION,Zona.CODIGO_POSTAL, zona.LOCALIDAD
+ from gd_esquema.Maestra   join Zona on  zona.Codigo_postal = maestra.CLIENTE_codigo_postal AND zona.Localidad = maestra.CLIENTE_localidad
+ where CLIENTE_DNI is not null
+ 
+
+end
+go
 
 
 --Stored procedure para migrar cupones (REVISAR SI ES PK COMPUESTA CON IMPORTE)
@@ -495,6 +513,12 @@ exec @migracionProveedores = [Migrar_Proveedores]
 select "Resultado proveedores" = @migracionProveedores
 go
 
+--Migra los Clientes (devuelve 0 si esta todo ok) 
+declare @migracionClientes int
+exec @migracionClinetes = [Migrar_Clientes]
+select "Resultado proveedores" = @migracionClientes
+go
+
 
 --Migra los canales de venta (devuelve 0 si esta todo ok)
 declare @migracionCanalesVenta int
@@ -503,10 +527,10 @@ select "Resultado Canales de Venta" = @migracionCanalesVenta
 go
 
 
---Migra las Zona Localidad (devuelve 0 si esta todo ok)
-declare @migracionZonaLocalidad int
-exec @migracionZonaLocalidad = [Migrar_Zona_Localidad]
-select "Resultado Zona Localidad" = @migracionZonaLocalidad
+--Migra las Zona  (devuelve 0 si esta todo ok)
+declare @migracionZona int
+exec @migracionZona = [Migrar_Zonas]
+select "Resultado Zona Localidad" = @migracionZona
 go
 
 
