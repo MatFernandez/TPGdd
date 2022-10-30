@@ -1,4 +1,3 @@
-
 ---------------------------------------------------------------------------------------------------------
 ------------------------------------- Creacion de stored procedures ------------------------------------
 ---------------------------------------------------------------------------------------------------------
@@ -12,7 +11,7 @@ begin
 create table Compra(
 	COMPRA_NUMERO decimal(19,0) not null,
 	COMPRA_PROVEEDOR nvarchar(50),
-	COMPRA_MEDIO_PAGO nvarchar(255),
+	COMPRA_MEDIO_PAGO int identity(1,1),
 	COMPRA_DESCUENTO_CODIGO decimal(19,0),
 	COMPRA_FECHA date,
 	COMPRA_TOTAL decimal(18,2)
@@ -36,10 +35,20 @@ create table Compra_Descuento(
 );
 
 
-create table Medio_de_Pago( 
-	MEDIO_PAGO_ID nvarchar(255) not null,
-	MEDIO_PAGO_COSTO decimal (18,2)
+create table Medio_de_Pago_Compra( 
+	COMPRA_MEDIO_PAGO_ID int not null,
+	COMPRA_MEDIO_PAGO nvarchar(255)
 );
+
+
+
+create table Medio_de_Pago_Venta( 
+	VENTA_MEDIO_PAGO_ID int identity (1,1) not null,
+	VENTA_MEDIO_PAGO nvarchar(255),
+	VENTA_MEDIO_PAGO_COSTO decimal(18,2)
+);
+
+
 
 
 
@@ -61,7 +70,7 @@ create table Canal_de_Venta(
 
 create table Venta_Descuento(
 	VENTA_CODIGO decimal(19,0),
-	VENTA_MEDIO_DE_PAGO_id nvarchar(255),
+	VENTA_DESCUENTO_MEDIO_DE_PAGO_ID int,
 	VENTA_DESCUENTO_CONCEPTO nvarchar(255),
 	VENTA_DESCUENTO_IMPORTE decimal (18,2)
 );
@@ -85,6 +94,7 @@ create table Cupon(
 create table Proveedor(
 	PROVEEDOR_CUIT nvarchar(50) not null,
 	PROVEEDOR_CP decimal(18,0),
+	PROVEEDOR_LOCALIDAD nvarchar(255),
 	PROVEEDOR_RAZON_SOCIAL nvarchar(50),
 	PROVEEDOR_MAIL nvarchar(50),
 	PROVEEDOR_DOMICILIO nvarchar(50)
@@ -106,7 +116,7 @@ create table Producto_Por_Variante(
 create table Venta(
 	VENTA_CODIGO decimal(19,0) not null,
 	VENTA_CLIENTE_CODIGO int,
-	VENTA_MEDIO_PAGO nvarchar(255),
+	VENTA_MEDIO_PAGO int,
 	VENTA_MEDIO_PAGO_COSTO decimal(18,2),
 	VENTA_CANAL nvarchar(255),
 	VENTA_CANAL_COSTO decimal(18,2),
@@ -128,6 +138,7 @@ create table Venta_Producto(
 create table Envio_CP(
 	ENVIO_ID int,
 	CODIGO_POSTAL decimal(18,0),
+	LOCALIDAD nvarchar(255), ------------
 	ENVIO_PRECIO decimal(18,2)
 );
 
@@ -151,28 +162,28 @@ create table Producto(
 
 create table Cliente(
 	CLIENTE_CODIGO int identity(1,1) not null,
-	CLIENTE_CP decimal (18,0),
 	CLIENTE_DNI decimal(18,0),
 	CLIENTE_NOMBRE nvarchar(255),
 	CLIENTE_APELLIDO nvarchar(255),
 	CLIENTE_TELEFONO decimal(18,0),
 	ClIENTE_MAIL nvarchar(255),
 	CLIENTE_FECHA_NAC date,
-	CLIENTE_DOMICILIO nvarchar(50)
+	CLIENTE_DIRECCION nvarchar(255),
+	CLIENTE_CP decimal (18,0),
+	CLIENTE_LOCALIDAD nvarchar(255),
 );
 
 
-create table Zona_Localidad(
-	LOCALIDAD_ID int identity(1,1) not null,
-	PROVINCIA nvarchar(50),
-	LOCALIDAD nvarchar(50)
-);
-
-
-create table Codigo_Postal(
+create table Zona(
 	CODIGO_POSTAL decimal(18,0) not null,
-	CODIGO_POSTAL_LOCALIDAD_ID nvarchar(50)
+	LOCALIDAD nvarchar(255) not null,
+	PROVINCIA nvarchar(50),
 );
+
+
+--create table Codigo_Postal(
+--	CODIGO_POSTAL_LOCALIDAD_ID nvarchar(50)
+--);
 
 
 --PRIMARY KEYS
@@ -180,14 +191,18 @@ create table Codigo_Postal(
 alter table Compra
 add primary key (COMPRA_NUMERO)
 
-alter table Medio_de_Pago 
-add primary key(MEDIO_PAGO_ID)
+alter table Medio_de_Pago_Compra 
+add primary key(COMPRA_MEDIO_PAGO_ID)
+
+alter table Medio_de_Pago_Venta 
+add primary key(VENTA_MEDIO_PAGO_ID)
 
 alter table Producto_Tipo_Variante 
 add primary key(PRODUCTO_VARIANTE_CODIGO)
 
 alter table Compra_Descuento 
 add primary key(DESCUENTO_COMPRA_CODIGO)
+
 
 alter table Canal_de_Venta
 add primary key (CANAL_ID)
@@ -216,11 +231,11 @@ add primary key (PRODUCTO_CODIGO)
 alter table Cliente
 add primary key (CLIENTE_CODIGO)
 
-alter table CODIGO_POSTAL 
-add primary key (CODIGO_POSTAL)
+--alter table CODIGO_POSTAL 
+--add primary key (CODIGO_POSTAL)  -- Que onda esto?? No se usaba en ningun lado
 
-alter table Zona_Localidad 
-add primary key(LOCALIDAD_ID)
+alter table Zona
+add constraint PK_Zona primary key(CODIGO_POSTAL,LOCALIDAD)
 
 
 --FOREING KEYS
@@ -229,7 +244,7 @@ alter table Compra
 add constraint FK_COMPRA_PROVEEDOR foreign key(COMPRA_PROVEEDOR) references Proveedor(PROVEEDOR_CUIT)
 
 alter table Compra
-add constraint FK_COMPRA_MEDIO_PAGO foreign key(COMPRA_MEDIO_PAGO) references Medio_de_Pago(MEDIO_PAGO_ID)
+add constraint FK_COMPRA_MEDIO_PAGO foreign key(COMPRA_MEDIO_PAGO) references Medio_de_Pago_Compra(COMPRA_MEDIO_PAGO_ID)
 
 alter table Compra
 add constraint FK_COMPRA_DESCUENTO_CODIGO foreign key(COMPRA_DESCUENTO_CODIGO) references Compra_Descuento(DESCUENTO_COMPRA_CODIGO)
@@ -247,7 +262,7 @@ alter table Venta_Descuento
 add constraint FK_VENTA_DESCUENTO_VENTA foreign key(VENTA_CODIGO) references Venta(VENTA_CODIGO)
 
 alter table Venta_Descuento
-add constraint FK_VENTA_DESCUENTO_MEDIO_DE_PAGO foreign key(VENTA_MEDIO_DE_PAGO_id) references Medio_De_Pago(MEDIO_PAGO_ID)
+add constraint FK_VENTA_DESCUENTO_MEDIO_DE_PAGO foreign key(VENTA_DESCUENTO_MEDIO_DE_PAGO_ID) references Medio_De_Pago_Venta(VENTA_MEDIO_PAGO_ID)
 
 alter table Venta_Por_Cupon
 add constraint FK_Venta_Por_Cupon_X_Cupon foreign key(VENTA_CODIGO) references Venta(VENTA_CODIGO)
@@ -256,7 +271,7 @@ alter table Venta_Por_Cupon
 add constraint FK_Venta_Por_Cupon foreign key(VENTA_CUPON_CODIGO) references Cupon(VENTA_CUPON_CODIGO)
 
 alter table Proveedor 
-add constraint FK_Proveedor_CP foreign key(PROVEEDOR_CP) references CODIGO_POSTAL(CODIGO_POSTAL)
+add constraint FK_Proveedor_ZONA foreign key(PROVEEDOR_CP,PROVEEDOR_LOCALIDAD) references ZONA(CODIGO_POSTAL,LOCALIDAD)
 
 alter table Producto_Por_Variante 
 add constraint FK_Producto_por_variante foreign key(PRODUCTO_CODIGO) references Producto(PRODUCTO_CODIGO)
@@ -271,7 +286,7 @@ alter table Venta
 add constraint FK_VENTA_CANAL foreign key(VENTA_CANAL) references Canal_de_Venta(CANAL_ID)
 
 alter table Venta 
-add constraint FK_VENTA_MEDIO_DE_PAGO foreign key(VENTA_MEDIO_PAGO) references Medio_De_Pago(MEDIO_PAGO_ID)
+add constraint FK_VENTA_MEDIO_DE_PAGO foreign key(VENTA_MEDIO_PAGO) references Medio_De_Pago_Venta(VENTA_MEDIO_PAGO_ID)
 
 alter table Venta 
 add constraint FK_VENTA_ENVIO foreign key(VENTA_ENVIO_CODIGO) references Envio(ENVIO_ID)
@@ -286,13 +301,13 @@ alter table Envio_CP
 add  constraint FK_ENVIO_CP_ENVIO foreign key(ENVIO_ID) references Envio(ENVIO_ID)
 
 alter table Envio_CP
-add  constraint FK_ENVIO_CP foreign key(CODIGO_POSTAL) references CODIGO_POSTAL(CODIGO_POSTAL)
+add  constraint FK_ENVIO_ZONA foreign key(CODIGO_POSTAL, LOCALIDAD) references Zona(CODIGO_POSTAL, LOCALIDAD)
 
 alter table Producto 
 add constraint FK_Producto_Por_Categoria foreign key(PRODUCTO_CATEGORIA) references Producto_Categoria(PRODUCTO_CATEGORIA_ID)
 
-alter table cliente 
-add constraint FK_CLIENTE_CP foreign key(CLIENTE_CP) references CODIGO_POSTAL(CODIGO_POSTAL)
+alter table Cliente 
+add constraint FK_CLIENTE_ZONA foreign key(CLIENTE_CP,CLIENTE_LOCALIDAD) references Zona(CODIGO_POSTAL,LOCALIDAD)
 
 end 
 go
@@ -308,7 +323,6 @@ DROP TABLE Venta_Descuento;
 DROP TABLE Venta_Producto;
 DROP TABLE Envio_CP;
 DROP TABLE Variante;
-DROP TABLE Zona_Localidad
 DROP TABLE Venta_Por_Cupon
 DROP TABLE Cupon
 DROP TABLE Compra;
@@ -318,76 +332,121 @@ DROP TABLE Cliente;
 DROP TABLE Canal_de_Venta;
 DROP TABLE Compra_Descuento;
 DROP TABLE Envio;
-DROP TABLE Medio_de_Pago;
 DROP TABLE Producto;
 DROP TABLE Producto_Categoria;
 DROP TABLE Producto_Tipo_Variante;
 DROP TABLE Proveedor;
-DROP TABLE Codigo_Postal
-end 
-go
-
-
---Stored procedure para migrar proveedores de la tabla maestra a nuestro modelo (DESACTUALIZADO)
-
-create procedure Migrar_Proveedores 
-as 
-begin
-insert into Proveedor
-
-select distinct Maestra.PROVEEDOR_CUIT, Maestra.PROVEEDOR_RAZON_SOCIAL, Maestra.PROVEEDOR_MAIL, Maestra.PROVEEDOR_DOMICILIO,
-Maestra.PROVEEDOR_CODIGO_POSTAL, Maestra.PROVEEDOR_LOCALIDAD, Maestra.PROVEEDOR_PROVINCIA from gd_esquema.Maestra
-where PROVEEDOR_CUIT is not null
-
-end
-go
-
-
---Stored procedure para migrar Zona-Localidad de Proveedores y Clientes
-
-create procedure Migrar_Zona_Localidad 
-as 
-begin
-insert into Zona_Localidad
-
-select distinct CLIENTE_PROVINCIA, CLIENTE_LOCALIDAD from gd_esquema.Maestra
-union 
-select distinct PROVEEDOR_PROVINCIA, PROVEEDOR_LOCALIDAD from gd_esquema.Maestra
-where CLIENTE_PROVINCIA is not null and CLIENTE_LOCALIDAD is not null
-and PROVEEDOR_PROVINCIA is not null and PROVEEDOR_LOCALIDAD is not null
-
+DROP TABLE Zona
+DROP TABLE Medio_De_Pago_Compra
+DROP TABLE Medio_De_Pago_Venta
 end 
 go
 
 
 
---Stored procedure para migrar cupones (REVISAR SI ES PK COMPUESTA CON IMPORTE)
 
-create procedure Migrar_Cupones
+
+
+--Stored procedure para migrar proveedores de la tabla maestra a nuestro modelo
+
+create procedure Migrar_Proveedores --Con left tira 21 resultados porque hay 3 con CP y localidad en NULL, tiene sentido no migrarlos? 
 as 
 begin
-insert into Cupon
+insert into Proveedor(PROVEEDOR_CUIT,PROVEEDOR_RAZON_SOCIAL,PROVEEDOR_MAIL,PROVEEDOR_CP,PROVEEDOR_LOCALIDAD,PROVEEDOR_DOMICILIO)
 
-select distinct VENTA_CUPON_CODIGO, VENTA_CUPON_IMPORTE, VENTA_CUPON_FECHA_DESDE, VENTA_CUPON_FECHA_HASTA, VENTA_CUPON_VALOR,
-VENTA_CUPON_TIPO from gd_esquema.Maestra
-where VENTA_CUPON_CODIGO is not null 
+select  distinct Maestra.PROVEEDOR_CUIT, Maestra.PROVEEDOR_RAZON_SOCIAL,
+ Maestra.PROVEEDOR_MAIL, zona.CODIGO_POSTAL,zona.LOCALIDAD, Maestra.PROVEEDOR_DOMICILIO
+ from gd_esquema.Maestra join Zona on  zona.Codigo_postal = maestra.proveedor_codigo_postal AND zona.Localidad = maestra.PROVEEDOR_localidad
+ where PROVEEDOR_CUIT is not null
 
 end
 go
 
 
---Stored procedure para migrar Canales de Ventas
 
-create procedure Migrar_Canal_de_Ventas
+--Stored procedure para migrar Zonas de la tabla maestra a nuestro modelo
+create procedure Migrar_Zonas
 as 
 begin
-insert into Canal_de_Venta
 
-select distinct cast (VENTA_CANAL as nvarchar(255)), VENTA_CANAL_COSTO from gd_esquema.Maestra
-where VENTA_CANAL is not null and VENTA_CANAL_COSTO is not null
+insert into Zona (CODIGO_POSTAL , LOCALIDAD , PROVINCIA)
+
+select distinct Maestra.CLIENTE_CODIGO_POSTAL, Maestra.CLIENTE_LOCALIDAD, Maestra.CLIENTE_PROVINCIA from gd_esquema.Maestra
+where CLIENTE_CODIGO_POSTAL is not null and CLIENTE_LOCALIDAD is not null 
+union
+select distinct Maestra.PROVEEDOR_CODIGO_POSTAL, Maestra.PROVEEDOR_LOCALIDAD, Maestra.PROVEEDOR_PROVINCIA from gd_esquema.Maestra
+where CLIENTE_PROVINCIA is not null and PROVEEDOR_PROVINCIA is not null
+ORDER BY CLIENTE_LOCALIDAD
 
 end
 go
+
+
+
+--Stored procedure para migrar clientes de la tabla maestra a nuestro modelo
+
+create procedure Migrar_Clientes
+as 
+begin
+insert into Cliente(CLIENTE_DNI,CLIENTE_NOMBRE,CLIENTE_APELLIDO,CLIENTE_TELEFONO,CLIENTE_MAIL,CLIENTE_FECHA_NAC,CLIENTE_DIRECCION,CLIENTE_CP, CLIENTE_LOCALIDAD)
+
+select  distinct Maestra.CLIENTE_DNI,Maestra.CLIENTE_NOMBRE, Maestra.CLIENTE_APELLIDO, Maestra.CLIENTE_TELEFONO,
+Maestra.CLIENTE_MAIL, Maestra.CLIENTE_FECHA_NAC,Maestra.CLIENTE_DIRECCION,Zona.CODIGO_POSTAL, Zona.LOCALIDAD
+ from gd_esquema.Maestra   join Zona on  zona.Codigo_postal = maestra.CLIENTE_codigo_postal AND zona.Localidad = maestra.CLIENTE_localidad
+ where CLIENTE_DNI is not null
+ 
+
+end
+go
+
+
+
+--Stored procedure para migrar Prodcucto_Categoria
+
+create procedure Migrar_Producto_Categoria
+as 
+begin
+insert into Producto_Categoria
+
+select distinct PRODUCTO_CATEGORIA from gd_esquema.Maestra
+where PRODUCTO_CATEGORIA is not null
+
+end
+go
+
+
+
+--Stored procedure para migrar Productos
+
+create procedure Migrar_Productos
+as 
+begin
+insert into Producto
+
+select distinct PRODUCTO_CODIGO, Producto_Categoria.PRODUCTO_CATEGORIA_ID, PRODUCTO_NOMBRE, PRODUCTO_DESCRIPCION, PRODUCTO_MATERIAL, PRODUCTO_MARCA from gd_esquema.Maestra
+join Producto_Categoria on Producto_Categoria.PRODUCTO_CATEGORIA = Maestra.PRODUCTO_CATEGORIA
+
+
+end
+go
+
+
+
+--Stored procedure para migrar Variantes
+
+create procedure Migrar_Variantes 
+as 
+begin
+insert into Variante
+
+select distinct Producto_Tipo_Variante.PRODUCTO_VARIANTE_CODIGO, maestra.PRODUCTO_VARIANTE from gd_esquema.Maestra
+left join Producto_Tipo_Variante on Producto_Tipo_Variante.PRODUCTO_VARIANTE_CODIGO = maestra.PRODUCTO_VARIANTE_CODIGO
+where Producto_Tipo_Variante.PRODUCTO_VARIANTE_CODIGO is not null
+
+end
+go
+
+
 
 
 --Stored procedure para migrar Productos tipo Variante
@@ -404,6 +463,31 @@ end
 go
 
 
+--Todas las tablas relacionadas con producto tiran 1310 resultados, y el select de todos los campos de producto (con distinct) tiran 
+--los mismos, asi que en teoria esta bien
+
+--select distinct PRODUCTO_CODIGO, PRODUCTO_CATEGORIA, PRODUCTO_DESCRIPCION, PRODUCTO_MARCA, PRODUCTO_MATERIAL, PRODUCTO_NOMBRE, PRODUCTO_TIPO_VARIANTE, 
+--PRODUCTO_VARIANTE_CODIGO, PRODUCTO_VARIANTE from gd_esquema.Maestra
+--where PRODUCTO_CODIGO is not null
+
+
+
+
+--Stored procedure para migrar Canales de Ventas
+
+create procedure Migrar_Canal_de_Ventas
+as 
+begin
+insert into Canal_de_Venta
+
+select distinct cast (VENTA_CANAL as nvarchar(255)), VENTA_CANAL_COSTO from gd_esquema.Maestra
+where VENTA_CANAL is not null and VENTA_CANAL_COSTO is not null
+
+end
+go
+
+
+
 --Stored procedure para migrar Compra_Descuento
 
 create procedure Migrar_Compra_Descuento
@@ -418,16 +502,45 @@ end
 go
 
 
---Stored procedure para migrar Medio_de_Pago
+-------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------------------------FALTA TERMINAR-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------------------------------------------------------------------
+/*
+
+select distinct  COMPRA_NUMERO, Proveedor.PROVEEDOR_CUIT, COMPRA_MEDIO_PAGO, Compra_Descuento.DESCUENTO_COMPRA_CODIGO, COMPRA_FECHA, COMPRA_TOTAL from gd_esquema.Maestra
+ left join Proveedor on Proveedor.PROVEEDOR_CUIT = maestra.PROVEEDOR_CUIT
+--left join Medio_De_Pago on Medio_De_Pago.MEDIO_PAGO_ID = maestra.VENTA_MEDIO_PAGO
+ join Compra_Descuento on Compra_Descuento.DESCUENTO_COMPRA_CODIGO = maestra.DESCUENTO_COMPRA_CODIGO
+where COMPRA_NUMERO is not null and COMPRA_MEDIO_PAGO is not null 
+
+*/
+
+
+
+
+--Stored procedure para migrar cupones (REVISAR SI ES PK COMPUESTA CON IMPORTE, ESPERAR A VER QUE RESPONDEN EN LOS MAILS)
+
+create procedure Migrar_Cupones
+as 
+begin
+insert into Cupon
+
+select distinct VENTA_CUPON_CODIGO, VENTA_CUPON_IMPORTE, VENTA_CUPON_FECHA_DESDE, VENTA_CUPON_FECHA_HASTA, VENTA_CUPON_VALOR,
+VENTA_CUPON_TIPO from gd_esquema.Maestra
+where VENTA_CUPON_CODIGO is not null 
+
+end
+go
+
+
+
+--Stored procedure para migrar Medio_de_Pago  (HAY QUE MIGRAR LOS 2, MEDIO_DE_PAGO_VENTA CON COSTO Y MEDIO_DE_PAGO_COMPRA)
 
 create procedure Migrar_Medio_de_Pago
 as
 begin
 insert into Medio_de_Pago
 
-select distinct COMPRA_MEDIO_PAGO, VENTA_MEDIO_PAGO_COSTO from gd_esquema.Maestra
-where COMPRA_MEDIO_PAGO is not null
-union
 select distinct VENTA_MEDIO_PAGO, VENTA_MEDIO_PAGO_COSTO from gd_esquema.Maestra
 where VENTA_MEDIO_PAGO is not null
 
@@ -436,25 +549,25 @@ go
 
 
 
---Stored procedure para migrar los Medio de Pago
+--Stored procedure para migrar Productos Por Variante
+--Precios de venta y compra?????
 
---Aca ojo porque el medio de pago para la Compra no tiene costo y para la Venta si, por eso uno los medios con null y los otros con su costo
---Si bien la consulta esta bien, no se puede insertar porque estamos duplicando los medios de pago (o sea las pks quedan duplicadas)
---Los medios son iguales para la Compra y la Venta (me fije en la maestra), capaz se puede omitir el union y quede el medio de pago con el costo,
---y que Compra SOLO traiga el medio sin el costo porque no le interesa
-
-create procedure Migrar_Medio_de_Pago
-as
+create procedure Migrar_Producto_Por_Variante
+as 
 begin
-insert into Medio_de_Pago
+insert into Producto_Por_Variante
 
-select distinct COMPRA_MEDIO_PAGO, VENTA_MEDIO_PAGO_COSTO from gd_esquema.Maestra
-where COMPRA_MEDIO_PAGO is not null
-union
-select distinct VENTA_MEDIO_PAGO, VENTA_MEDIO_PAGO_COSTO from gd_esquema.Maestra
-where VENTA_MEDIO_PAGO is not null
+select Producto.PRODUCTO_CODIGO, Producto_Tipo_Variante.PRODUCTO_VARIANTE_CODIGO  from gd_esquema.Maestra
+
 end
 go
+
+
+
+
+
+
+
 
 
 
@@ -466,10 +579,17 @@ drop procedure Migrar_Medio_de_Pago
 drop procedure Migrar_Compra_Descuento
 drop procedure Migrar_Producto_Tipo_Variante
 drop procedure Migrar_Canal_de_Ventas
-drop procedure Migrar_Cupones
 drop procedure Migrar_Proveedores
-drop procedure Migrar_Zona_Localidad
 drop procedure Borrar_Tablas
+drop procedure Crear_Tablas
+drop procedure Migrar_Clientes
+drop procedure Migrar_Producto_Categoria
+drop procedure Migrar_Productos
+drop procedure Migrar_Variantes
+drop procedure Migrar_Zonas
+
+
+
 
 
 ---------------------------------------------------------------------------------------------------------
@@ -497,6 +617,13 @@ select "Resultado proveedores" = @migracionProveedores
 go
 
 
+--Migra los Clientes (devuelve 0 si esta todo ok) 
+declare @migracionClientes int
+exec @migracionClientes = [Migrar_Clientes]
+select "Resultado proveedores" = @migracionClientes
+go
+
+
 --Migra los canales de venta (devuelve 0 si esta todo ok)
 declare @migracionCanalesVenta int
 exec @migracionCanalesVenta = [Migrar_Canal_de_Ventas]
@@ -504,19 +631,10 @@ select "Resultado Canales de Venta" = @migracionCanalesVenta
 go
 
 
-
-
---Migra las Zona Localidad (devuelve 0 si esta todo ok)
-declare @migracionZonaLocalidad int
-exec @migracionZonaLocalidad = [Migrar_Zona_Localidad]
-select "Resultado Zona Localidad" = @migracionZonaLocalidad
-go
-
-
---Migra los Cupones (devuelve 0 si esta todo ok)
-declare @migracionCupones int
-exec @migracionCupones = [Migrar_Cupones]
-select "Resultado Cupones" = @migracionCupones
+--Migra las Zona  (devuelve 0 si esta todo ok)
+declare @migracionZona int
+exec @migracionZona = [Migrar_Zonas]
+select "Resultado Zona Localidad" = @migracionZona
 go
 
 
@@ -534,6 +652,13 @@ select "Resultado Cupones" = @migracionCompraDescuento
 go
 
 
+--Migra los Cupones (devuelve 0 si esta todo ok) --FALTA TERMINAR LA MIGRACION, NO EJECUTAR
+declare @migracionCupones int
+exec @migracionCupones = [Migrar_Cupones]
+select "Resultado Cupones" = @migracionCupones
+go
+
+
 
 
 --------------------------------------------------------------------------------------------------------------------
@@ -541,35 +666,10 @@ go
 --------------------------------------------------------------------------------------------------------------------
 
 
-select * from Canal_de_Venta
-select * from Zona_Localidad
-select * from Producto_Tipo_Variante
-select * from Compra_Descuento
 
+--Despues de confirmar los cambios de Medio de Pago en el DER, se podria cargar Compra, Venta, etc
+--Las relacionadas con Venta
+--Que onda el precio unitario compra y precio unitario venta en producto por variante? Por eso no la cargue todavia
 
-
-select * from Variante
-
-select * from Codigo_Postal
-
-select * from Cliente
-
-insert into Cliente
-select distinct CLIENTE_CODIGO_POSTAL, CLIENTE_DNI, CLIENTE_NOMBRE, CLIENTE_APELLIDO, CLIENTE_TELEFONO, 
- CLIENTE_MAIL, CLIENTE_FECHA_NAC, CLIENTE_LOCALIDAD from gd_esquema.Maestra
- where CLIENTE_DNI is not null
-
-
-select CLIENTE_DIRECCION from gd_esquema.Maestra
-
-select * from Cupon
-
-
-select distinct VENTA_CUPON_CODIGO, VENTA_CUPON_IMPORTE, VENTA_CUPON_FECHA_DESDE, VENTA_CUPON_FECHA_HASTA,
-VENTA_CUPON_VALOR, VENTA_CUPON_TIPO from gd_esquema.Maestra
-where VENTA_CUPON_CODIGO is not null
-order by VENTA_CUPON_CODIGO
-
-
-select PRODUCTO_CATEGORIA from gd_esquema.Maestra
-where PRODUCTO_CATEGORIA is not null
+--Acomodar bien el orden de ejecucion de los procedures para que se puedan crear bien las tablas
+--Faltan algunos declare @... justo aca arriba. Igualmente se puede migrar las tablas seleccionando solo el insert y el select y fue
