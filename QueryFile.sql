@@ -78,11 +78,12 @@ create table Venta_Descuento(
 
 create table Venta_Por_Cupon(
 	VENTA_CODIGO decimal(19,0),
-	VENTA_CUPON_CODIGO nvarchar(255),
+	VENTA_CUPON_CODIGO int,
 	Venta_CUPON_Total decimal(18,2)
 );
 
 create table Cupon(
+	VENTA_CUPON_CODIGO_ID int identity(1,1) not null,
 	VENTA_CUPON_CODIGO nvarchar(255) not null,
 	VENTA_CUPON_IMPORTE decimal(18,2),
 	VENTA_CUPON_FECHA_DESDE date,
@@ -209,7 +210,7 @@ alter table Canal_de_Venta
 add primary key (CANAL_ID)
 
 alter table Cupon 
-add primary key (VENTA_CUPON_CODIGO)
+add primary key (VENTA_CUPON_CODIGO_ID)
 
 alter table Proveedor  
 add primary key (PROVEEDOR_CUIT)
@@ -269,7 +270,7 @@ alter table Venta_Por_Cupon
 add constraint FK_Venta_Por_Cupon_X_Cupon foreign key(VENTA_CODIGO) references Venta(VENTA_CODIGO)
 
 alter table Venta_Por_Cupon
-add constraint FK_Venta_Por_Cupon foreign key(VENTA_CUPON_CODIGO) references Cupon(VENTA_CUPON_CODIGO)
+add constraint FK_Venta_Por_Cupon foreign key(VENTA_CUPON_CODIGO) references Cupon(VENTA_CUPON_CODIGO_ID)
 
 alter table Proveedor 
 add constraint FK_Proveedor_ZONA foreign key(PROVEEDOR_CP,PROVEEDOR_LOCALIDAD) references ZONA(CODIGO_POSTAL,LOCALIDAD)
@@ -553,13 +554,93 @@ as
 begin
 insert into Producto_Por_Variante
 
-select distinct  Producto.PRODUCTO_CODIGO, Producto_Tipo_Variante.PRODUCTO_VARIANTE_CODIGO, null, null from gd_esquema.Maestra
+select distinct Producto.PRODUCTO_CODIGO, Producto_Tipo_Variante.PRODUCTO_VARIANTE_CODIGO, null, null from gd_esquema.Maestra
 join Producto on Producto.PRODUCTO_CODIGO = Maestra.PRODUCTO_CODIGO
 join Producto_Tipo_Variante on Producto_Tipo_Variante.PRODUCTO_VARIANTE_CODIGO = Maestra.PRODUCTO_VARIANTE_CODIGO
 
 end
 go
 
+
+
+--Stored procedure para Venta_Producto
+
+create procedure Migrar_Compra_Producto 
+as 
+begin
+insert into Compra_Producto
+
+select distinct Producto_Por_Variante.PRODUCTO_CODIGO, Producto_Por_Variante.PRODUCTO_VARIANTE_CODIGO, Compra.COMPRA_NUMERO,
+COMPRA_PRODUCTO_CANTIDAD, COMPRA_PRODUCTO_PRECIO from gd_esquema.Maestra 
+join Producto_Por_Variante on Producto_Por_Variante.PRODUCTO_CODIGO = Maestra.PRODUCTO_CODIGO and Producto_Por_Variante.PRODUCTO_VARIANTE_CODIGO = Maestra.PRODUCTO_VARIANTE_CODIGO 
+join Compra on Compra.COMPRA_NUMERO = Maestra.COMPRA_NUMERO
+where Producto_Por_Variante.PRODUCTO_CODIGO is not null and Compra.COMPRA_NUMERO is not null
+order by COMPRA_NUMERO ASC
+
+end
+go
+
+
+
+--Stored procedure para migrar cupones
+
+create procedure Migrar_Cupones
+as 
+begin
+insert into Cupon
+
+select distinct VENTA_CUPON_CODIGO, VENTA_CUPON_IMPORTE, VENTA_CUPON_FECHA_DESDE, VENTA_CUPON_FECHA_HASTA, VENTA_CUPON_VALOR,
+VENTA_CUPON_TIPO from gd_esquema.Maestra
+where VENTA_CUPON_CODIGO is not null 
+
+end
+go
+
+
+
+-- store procedure para migrar Envio
+create procedure Migrar_Envios
+as
+begin 
+insert into Envio 
+select distinct VENTA_MEDIO_ENVIO, VENTA_ENVIO_PRECIO,NULL from gd_esquema.Maestra
+where VENTA_MEDIO_ENVIO is not null
+end
+go
+
+
+
+-- store procedure para migrar Envio_CP
+create procedure Migrar_Envio_CP
+as
+begin
+
+insert into Envio_CP
+select distinct ENVIO_ID, CODIGO_POSTAL, LOCALIDAD, ENVIO_PRECIO from gd_esquema.Maestra join Envio on VENTA_MEDIO_ENVIO=ENVIO_MEDIO and VENTA_ENVIO_PRECIO=ENVIO_PRECIO
+join Zona on Cliente_Localidad = Localidad and Cliente_Codigo_Postal = Codigo_Postal
+
+end
+go
+
+
+
+
+--Stored procedure para migrar Ventas
+
+create procedure Migrar_Ventas
+as 
+begin
+insert into Venta
+
+select distinct VENTA_CODIGO, cliente.CLIENTE_CODIGO, Medio_de_Pago_Venta.VENTA_MEDIO_PAGO_ID, Medio_de_Pago_Venta.VENTA_MEDIO_PAGO_COSTO,
+Canal_de_Venta.CANAL_ID, Canal_de_Venta.CANAL_COSTO,Envio.ENVIO_ID, Envio.ENVIO_PRECIO, VENTA_FECHA, VENTA_TOTAL from gd_esquema.Maestra
+join Cliente on cliente.CLIENTE_DNI = maestra.CLIENTE_DNI and cliente.CLIENTE_APELLIDO = Maestra.CLIENTE_APELLIDO
+join Medio_de_Pago_Venta on Medio_de_Pago_Venta.VENTA_MEDIO_PAGO = maestra.VENTA_MEDIO_PAGO
+join Canal_de_Venta on Canal_de_Venta.CANAL_ID= Maestra.VENTA_CANAL
+join Envio on Envio.ENVIO_MEDIO = Maestra.VENTA_MEDIO_ENVIO and Envio.ENVIO_PRECIO = Maestra.VENTA_ENVIO_PRECIO
+
+end
+go
 
 
 
@@ -576,21 +657,6 @@ and DESCUENTO_COMPRA_CODIGO is not null
 
 
 
-
-
---Stored procedure para migrar cupones (REVISAR SI ES PK COMPUESTA CON IMPORTE, ESPERAR A VER QUE RESPONDEN EN LOS MAILS)
-
-create procedure Migrar_Cupones
-as 
-begin
-insert into Cupon
-
-select distinct VENTA_CUPON_CODIGO, VENTA_CUPON_IMPORTE, VENTA_CUPON_FECHA_DESDE, VENTA_CUPON_FECHA_HASTA, VENTA_CUPON_VALOR,
-VENTA_CUPON_TIPO from gd_esquema.Maestra
-where VENTA_CUPON_CODIGO is not null 
-
-end
-go
 
 
 
