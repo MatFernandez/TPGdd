@@ -1,3 +1,4 @@
+
 ---------------------------------------------------------------------------------------------------------
 ------------------------------------- Creacion de stored procedures ------------------------------------
 ---------------------------------------------------------------------------------------------------------
@@ -11,7 +12,7 @@ begin
 create table Compra(
 	COMPRA_NUMERO decimal(19,0) not null,
 	COMPRA_PROVEEDOR nvarchar(50),
-	COMPRA_MEDIO_PAGO int identity(1,1),
+	COMPRA_MEDIO_PAGO int,
 	COMPRA_DESCUENTO_CODIGO decimal(19,0),
 	COMPRA_FECHA date,
 	COMPRA_TOTAL decimal(18,2)
@@ -36,7 +37,7 @@ create table Compra_Descuento(
 
 
 create table Medio_de_Pago_Compra( 
-	COMPRA_MEDIO_PAGO_ID int not null,
+	COMPRA_MEDIO_PAGO_ID int identity (1,1) not null,
 	COMPRA_MEDIO_PAGO nvarchar(255)
 );
 
@@ -109,8 +110,8 @@ create table Producto_Categoria(
 create table Producto_Por_Variante(
 	PRODUCTO_CODIGO nvarchar(50) not null,
 	PRODUCTO_VARIANTE_CODIGO nvarchar(50)  not null,
-	PRECIO_UNITARIO_VENTA decimal(18,2),
-	PRECIO_UNITARIO_COMPRA decimal(18,2)
+	PRECIO_UNITARIO_VENTA decimal(18,2) default null ,
+	PRECIO_UNITARIO_COMPRA decimal(18,2) default null
 );
 
 create table Venta(
@@ -344,27 +345,7 @@ go
 
 
 
-
-
-
---Stored procedure para migrar proveedores de la tabla maestra a nuestro modelo
-
-create procedure Migrar_Proveedores --Con left tira 21 resultados porque hay 3 con CP y localidad en NULL, tiene sentido no migrarlos? 
-as 
-begin
-insert into Proveedor(PROVEEDOR_CUIT,PROVEEDOR_RAZON_SOCIAL,PROVEEDOR_MAIL,PROVEEDOR_CP,PROVEEDOR_LOCALIDAD,PROVEEDOR_DOMICILIO)
-
-select  distinct Maestra.PROVEEDOR_CUIT, Maestra.PROVEEDOR_RAZON_SOCIAL,
- Maestra.PROVEEDOR_MAIL, zona.CODIGO_POSTAL,zona.LOCALIDAD, Maestra.PROVEEDOR_DOMICILIO
- from gd_esquema.Maestra join Zona on  zona.Codigo_postal = maestra.proveedor_codigo_postal AND zona.Localidad = maestra.PROVEEDOR_localidad
- where PROVEEDOR_CUIT is not null
-
-end
-go
-
-
-
---Stored procedure para migrar Zonas de la tabla maestra a nuestro modelo
+--Stored procedure para migrar Zonas
 create procedure Migrar_Zonas
 as 
 begin
@@ -383,7 +364,24 @@ go
 
 
 
---Stored procedure para migrar clientes de la tabla maestra a nuestro modelo
+--Stored procedure para migrar Proveedores
+
+create procedure Migrar_Proveedores --Con left tira 21 resultados porque hay 3 con CP y localidad en NULL, tiene sentido no migrarlos? 
+as 
+begin
+insert into Proveedor(PROVEEDOR_CUIT,PROVEEDOR_RAZON_SOCIAL,PROVEEDOR_MAIL,PROVEEDOR_CP,PROVEEDOR_LOCALIDAD,PROVEEDOR_DOMICILIO)
+
+select  distinct Maestra.PROVEEDOR_CUIT, Maestra.PROVEEDOR_RAZON_SOCIAL,
+ Maestra.PROVEEDOR_MAIL, zona.CODIGO_POSTAL,zona.LOCALIDAD, Maestra.PROVEEDOR_DOMICILIO
+ from gd_esquema.Maestra left join Zona on  zona.Codigo_postal = maestra.proveedor_codigo_postal AND zona.Localidad = maestra.PROVEEDOR_localidad
+ where PROVEEDOR_CUIT is not null
+
+end
+go
+
+
+
+--Stored procedure para migrar Clientes
 
 create procedure Migrar_Clientes
 as 
@@ -392,10 +390,9 @@ insert into Cliente(CLIENTE_DNI,CLIENTE_NOMBRE,CLIENTE_APELLIDO,CLIENTE_TELEFONO
 
 select  distinct Maestra.CLIENTE_DNI,Maestra.CLIENTE_NOMBRE, Maestra.CLIENTE_APELLIDO, Maestra.CLIENTE_TELEFONO,
 Maestra.CLIENTE_MAIL, Maestra.CLIENTE_FECHA_NAC,Maestra.CLIENTE_DIRECCION,Zona.CODIGO_POSTAL, Zona.LOCALIDAD
- from gd_esquema.Maestra   join Zona on  zona.Codigo_postal = maestra.CLIENTE_codigo_postal AND zona.Localidad = maestra.CLIENTE_localidad
- where CLIENTE_DNI is not null
+from gd_esquema.Maestra   join Zona on  zona.Codigo_postal = maestra.CLIENTE_codigo_postal AND zona.Localidad = maestra.CLIENTE_localidad
+where CLIENTE_DNI is not null
  
-
 end
 go
 
@@ -426,6 +423,20 @@ insert into Producto
 select distinct PRODUCTO_CODIGO, Producto_Categoria.PRODUCTO_CATEGORIA_ID, PRODUCTO_NOMBRE, PRODUCTO_DESCRIPCION, PRODUCTO_MATERIAL, PRODUCTO_MARCA from gd_esquema.Maestra
 join Producto_Categoria on Producto_Categoria.PRODUCTO_CATEGORIA = Maestra.PRODUCTO_CATEGORIA
 
+end
+go
+
+
+
+--Stored procedure para migrar Productos tipo Variante
+
+create procedure Migrar_Producto_Tipo_Variante
+as 
+begin
+insert into Producto_Tipo_Variante
+
+select distinct PRODUCTO_VARIANTE_CODIGO, PRODUCTO_TIPO_VARIANTE from gd_esquema.Maestra
+where PRODUCTO_VARIANTE_CODIGO is not null and PRODUCTO_TIPO_VARIANTE is not null
 
 end
 go
@@ -448,28 +459,12 @@ go
 
 
 
-
---Stored procedure para migrar Productos tipo Variante
-
-create procedure Migrar_Producto_Tipo_Variante
-as 
-begin
-insert into Producto_Tipo_Variante
-
-select distinct PRODUCTO_VARIANTE_CODIGO, PRODUCTO_TIPO_VARIANTE from gd_esquema.Maestra
-where PRODUCTO_VARIANTE_CODIGO is not null and PRODUCTO_TIPO_VARIANTE is not null
-
-end
-go
-
-
 --Todas las tablas relacionadas con producto tiran 1310 resultados, y el select de todos los campos de producto (con distinct) tiran 
 --los mismos, asi que en teoria esta bien
 
 --select distinct PRODUCTO_CODIGO, PRODUCTO_CATEGORIA, PRODUCTO_DESCRIPCION, PRODUCTO_MARCA, PRODUCTO_MATERIAL, PRODUCTO_NOMBRE, PRODUCTO_TIPO_VARIANTE, 
 --PRODUCTO_VARIANTE_CODIGO, PRODUCTO_VARIANTE from gd_esquema.Maestra
 --where PRODUCTO_CODIGO is not null
-
 
 
 
@@ -502,18 +497,83 @@ end
 go
 
 
+
+--Stored procedure para migrar Medio de Pago Compra
+
+create procedure Migrar_Medio_De_Pago_Compra
+as 
+begin
+insert into Medio_de_Pago_Compra
+
+select distinct COMPRA_MEDIO_PAGO  from gd_esquema.Maestra
+where COMPRA_MEDIO_PAGO is not null
+
+end
+go
+
+
+
+--Stored procedure para migrar Medio de Pago Venta
+
+create procedure Migrar_Medio_De_Pago_Venta
+as 
+begin
+insert into Medio_de_Pago_Venta
+
+select distinct VENTA_MEDIO_PAGO, VENTA_MEDIO_PAGO_COSTO from gd_esquema.Maestra
+where VENTA_MEDIO_PAGO is not null
+
+end
+go
+
+
+
+--Stored procedure para migrar Compras
+
+create procedure Migrar_Compras
+as 
+begin
+insert into Compra
+
+select distinct COMPRA_NUMERO, Proveedor.PROVEEDOR_CUIT, Medio_de_Pago_Compra.COMPRA_MEDIO_PAGO_ID, Compra_Descuento.DESCUENTO_COMPRA_CODIGO, COMPRA_FECHA, COMPRA_TOTAL from gd_esquema.Maestra
+left join Proveedor on Proveedor.PROVEEDOR_CUIT = maestra.PROVEEDOR_CUIT
+join Medio_de_Pago_Compra on Medio_De_Pago_Compra.COMPRA_MEDIO_PAGO = maestra.COMPRA_MEDIO_PAGO
+left join Compra_Descuento on Compra_Descuento.DESCUENTO_COMPRA_CODIGO = maestra.DESCUENTO_COMPRA_CODIGO
+where COMPRA_NUMERO is not null and Compra_Descuento.DESCUENTO_COMPRA_CODIGO is not null
+
+end
+go
+
+
+
+--Stored procedure para migrar Producto por Variante
+
+create procedure Migrar_Producto_Por_Variante
+as 
+begin
+insert into Producto_Por_Variante
+
+select distinct  Producto.PRODUCTO_CODIGO, Producto_Tipo_Variante.PRODUCTO_VARIANTE_CODIGO, null, null from gd_esquema.Maestra
+join Producto on Producto.PRODUCTO_CODIGO = Maestra.PRODUCTO_CODIGO
+join Producto_Tipo_Variante on Producto_Tipo_Variante.PRODUCTO_VARIANTE_CODIGO = Maestra.PRODUCTO_VARIANTE_CODIGO
+
+end
+go
+
+
+
+
 -------------------------------------------------------------------------------------------------------------------------------------------------
 ---------------------------------------------------FALTA TERMINAR-------------------------------------------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------------
-/*
 
-select distinct  COMPRA_NUMERO, Proveedor.PROVEEDOR_CUIT, COMPRA_MEDIO_PAGO, Compra_Descuento.DESCUENTO_COMPRA_CODIGO, COMPRA_FECHA, COMPRA_TOTAL from gd_esquema.Maestra
- left join Proveedor on Proveedor.PROVEEDOR_CUIT = maestra.PROVEEDOR_CUIT
---left join Medio_De_Pago on Medio_De_Pago.MEDIO_PAGO_ID = maestra.VENTA_MEDIO_PAGO
- join Compra_Descuento on Compra_Descuento.DESCUENTO_COMPRA_CODIGO = maestra.DESCUENTO_COMPRA_CODIGO
-where COMPRA_NUMERO is not null and COMPRA_MEDIO_PAGO is not null 
+--Este es el select para saber las compras (diferentes segun su COMPRA_NUMERO porque son unicas) de la tabla maestra.
+--Coincide con el nuestro
+select distinct COMPRA_NUMERO, PROVEEDOR_CUIT, COMPRA_MEDIO_PAGO, DESCUENTO_COMPRA_CODIGO, COMPRA_FECHA, COMPRA_TOTAL from gd_esquema.Maestra where COMPRA_NUMERO is not null
+and DESCUENTO_COMPRA_CODIGO is not null
 
-*/
+
+
 
 
 
@@ -534,43 +594,6 @@ go
 
 
 
---Stored procedure para migrar Medio_de_Pago  (HAY QUE MIGRAR LOS 2, MEDIO_DE_PAGO_VENTA CON COSTO Y MEDIO_DE_PAGO_COMPRA)
-
-create procedure Migrar_Medio_de_Pago
-as
-begin
-insert into Medio_de_Pago
-
-select distinct VENTA_MEDIO_PAGO, VENTA_MEDIO_PAGO_COSTO from gd_esquema.Maestra
-where VENTA_MEDIO_PAGO is not null
-
-end
-go
-
-
-
---Stored procedure para migrar Productos Por Variante
---Precios de venta y compra?????
-
-create procedure Migrar_Producto_Por_Variante
-as 
-begin
-insert into Producto_Por_Variante
-
-select Producto.PRODUCTO_CODIGO, Producto_Tipo_Variante.PRODUCTO_VARIANTE_CODIGO  from gd_esquema.Maestra
-
-end
-go
-
-
-
-
-
-
-
-
-
-
 
 
 --Para borrar los stored procedures anteriores
@@ -587,9 +610,6 @@ drop procedure Migrar_Producto_Categoria
 drop procedure Migrar_Productos
 drop procedure Migrar_Variantes
 drop procedure Migrar_Zonas
-
-
-
 
 
 ---------------------------------------------------------------------------------------------------------
@@ -616,7 +636,6 @@ exec @migracionProveedores = [Migrar_Proveedores]
 select "Resultado proveedores" = @migracionProveedores
 go
 
-
 --Migra los Clientes (devuelve 0 si esta todo ok) 
 declare @migracionClientes int
 exec @migracionClientes = [Migrar_Clientes]
@@ -636,6 +655,7 @@ declare @migracionZona int
 exec @migracionZona = [Migrar_Zonas]
 select "Resultado Zona Localidad" = @migracionZona
 go
+
 
 
 --Migra los Productos tipo Variante (devuelve 0 si esta todo ok)
@@ -664,12 +684,6 @@ go
 --------------------------------------------------------------------------------------------------------------------
 ----------------------- Consultas utiles para probar si funcionan los procedures y otros comentarios ---------------
 --------------------------------------------------------------------------------------------------------------------
-
-
-
---Despues de confirmar los cambios de Medio de Pago en el DER, se podria cargar Compra, Venta, etc
---Las relacionadas con Venta
---Que onda el precio unitario compra y precio unitario venta en producto por variante? Por eso no la cargue todavia
 
 --Acomodar bien el orden de ejecucion de los procedures para que se puedan crear bien las tablas
 --Faltan algunos declare @... justo aca arriba. Igualmente se puede migrar las tablas seleccionando solo el insert y el select y fue
